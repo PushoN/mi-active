@@ -33,4 +33,5 @@ ext {
   buildToolsVersion = '27.0.3'
   supportLibVersion = '27.0.2'
   rxJavaVersion = '2.1.7'
+  koinVersion = '0.7.1'
 }

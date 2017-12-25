@@ -1,0 +1,21 @@
+package com.arthurnagy.miband
+
+@JvmField internal val PAIR = byteArrayOf(2)
+@JvmField internal val VIBRATION_WITH_LED = byteArrayOf(1)
+@JvmField internal val VIBRATION_10_TIMES_WITH_LED = byteArrayOf(2)
+@JvmField internal val VIBRATION_WITHOUT_LED = byteArrayOf(4)
+@JvmField internal val STOP_VIBRATION = byteArrayOf(0)
+@JvmField internal val ENABLE_REALTIME_STEPS_NOTIFY = byteArrayOf(3, 1)
+@JvmField internal val DISABLE_REALTIME_STEPS_NOTIFY = byteArrayOf(3, 0)
+@JvmField internal val ENABLE_SENSOR_DATA_NOTIFY = byteArrayOf(18, 1)
+@JvmField internal val DISABLE_SENSOR_DATA_NOTIFY = byteArrayOf(18, 0)
+@JvmField internal val SET_COLOR_RED = byteArrayOf(14, 6, 1, 2, 1)
+@JvmField internal val SET_COLOR_BLUE = byteArrayOf(14, 0, 6, 6, 1)
+@JvmField internal val SET_COLOR_ORANGE = byteArrayOf(14, 6, 2, 0, 1)
+@JvmField internal val SET_COLOR_GREEN = byteArrayOf(14, 4, 5, 0, 1)
+@JvmField internal val START_HEART_RATE_SCAN = byteArrayOf(21, 2, 1)
+
+@JvmField internal val REBOOT = byteArrayOf(12)
+@JvmField internal val REMOTE_DISCONNECT = byteArrayOf(1)
+@JvmField internal val FACTORY_RESET = byteArrayOf(9)
+@JvmField internal val SELF_TEST = byteArrayOf(2)
