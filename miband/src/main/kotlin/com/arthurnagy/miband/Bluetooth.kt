@@ -1,24 +1,36 @@
 package com.arthurnagy.miband
 
+import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothGattService
+import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.bluetooth.le.BluetoothLeScanner
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanResult
 import android.content.Context
+import com.arthurnagy.miband.Bluetooth.ErrorType.SCAN_FAILED
 import com.arthurnagy.miband.Bluetooth.Event.CharacteristicChanged
+import io.reactivex.Observable
 import io.reactivex.processors.FlowableProcessor
 import io.reactivex.processors.PublishProcessor
+import timber.log.Timber
 import java.util.UUID
 
-class Bluetooth {
+class Bluetooth constructor(private val bluetoothManager: BluetoothManager) {
 
     val bluetoothEvents: FlowableProcessor<Event> = PublishProcessor.create()
+    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
     private var bluetoothGatt: BluetoothGatt? = null
     private val bluetoothGattCallback = object : BluetoothGattCallback() {
+
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
             super.onConnectionStateChange(gatt, status, newState)
+            Timber.d("onConnectionStateChange: gatt: $gatt, status: $status, newState: $newState")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 gatt.discoverServices()
             } else {
@@ -29,6 +41,7 @@ class Bluetooth {
 
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             super.onServicesDiscovered(gatt, status)
+            Timber.d("onServicesDiscovered: gatt: $gatt, status: $status")
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 bluetoothGatt = gatt
                 bluetoothEvents.onNext(Event.Connected)
@@ -39,6 +52,7 @@ class Bluetooth {
 
         override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             super.onCharacteristicRead(gatt, characteristic, status)
+            Timber.d("onCharacteristicRead: gatt: $gatt, characteristic: $characteristic, status: $status")
             if (BluetoothGatt.GATT_SUCCESS == status) {
                 bluetoothEvents.onNext(Event.Success(characteristic))
             } else {
@@ -50,6 +64,7 @@ class Bluetooth {
 
         override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
             super.onCharacteristicWrite(gatt, characteristic, status)
+            Timber.d(".onCharacteristicWrite: gatt: $gatt, characteristic: $characteristic, status: $status")
             if (BluetoothGatt.GATT_SUCCESS == status) {
                 bluetoothEvents.onNext(Event.Success(characteristic))
             } else {
@@ -61,11 +76,13 @@ class Bluetooth {
 
         override fun onCharacteristicChanged(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic) {
             super.onCharacteristicChanged(gatt, characteristic)
+            Timber.d("onCharacteristicChanged: gatt: $gatt, characteristic: $characteristic")
             bluetoothEvents.onNext(CharacteristicChanged(characteristic.uuid, characteristic.value))
         }
 
         override fun onReadRemoteRssi(gatt: BluetoothGatt, rssi: Int, status: Int) {
             super.onReadRemoteRssi(gatt, rssi, status)
+            Timber.d("onReadRemoteRssi: gatt: $gatt, rssi: $rssi, status: $status")
             if (BluetoothGatt.GATT_SUCCESS == status) {
                 bluetoothEvents.onNext(Event.SuccessRssi(rssi))
             } else {
@@ -78,6 +95,35 @@ class Bluetooth {
 
     private fun errorServiceNotExisting(serviceUUID: UUID) = "BluetoothGattService $serviceUUID does not exist"
 
+    private fun scan(scanMethod: (BluetoothLeScanner, ScanCallback) -> Unit): Observable<ScanResult> {
+        return (Observable.create<ScanResult> { emitter ->
+            if (bluetoothAdapter == null) {
+                emitter.onError(NullPointerException("BluetoothAdapter is null"))
+            } else {
+                val scanner = bluetoothAdapter.bluetoothLeScanner
+                if (scanner == null) {
+                    emitter.onError(NullPointerException("BluetoothLeScanner is null"))
+                } else {
+                    scanMethod.invoke(scanner, object : ScanCallback() {
+                        override fun onScanResult(callbackType: Int, result: ScanResult?) {
+                            result?.let {
+                                emitter.onNext(result)
+                            }
+                        }
+
+                        override fun onScanFailed(errorCode: Int) {
+                            emitter.onError(Exception("BluetoothLe scan failed with code: $errorCode"))
+                        }
+                    })
+                }
+            }
+        }).doOnNext { bluetoothEvents.onNext(Event.Scan(it)) }.doOnError { bluetoothEvents.onNext(Event.Error(SCAN_FAILED, it.message.orEmpty())) }
+    }
+
+    fun scanDevices(): Observable<ScanResult> = scan(BluetoothLeScanner::startScan)
+
+    fun stopDeviceScan(): Observable<ScanResult> = scan(BluetoothLeScanner::stopScan)
+
     /**
      * Connects to the Bluetooth device
      * @param context Context
@@ -88,14 +134,13 @@ class Bluetooth {
         device.connectGatt(context, false, bluetoothGattCallback)
     }
 
+    fun getConnectedDevices(): MutableList<BluetoothDevice> = bluetoothManager.getConnectedDevices(BluetoothProfile.GATT_SERVER)
     /**
      * Gets remote connected device
 
      * @return Connected device or null
      */
-    fun getConnectedDevice(): BluetoothDevice? {
-        return bluetoothGatt?.device
-    }
+    fun getConnectedDevice(): BluetoothDevice? = bluetoothGatt?.device
 
     /**
      * Writes data to the service
@@ -108,9 +153,9 @@ class Bluetooth {
     fun writeCharacteristic(serviceUUID: UUID, characteristicId: UUID, value: ByteArray) {
         checkConnectionState()
 
-        val service = bluetoothGatt?.getService(serviceUUID)
+        val service: BluetoothGattService? = bluetoothGatt?.getService(serviceUUID)
         if (service != null) {
-            val characteristic = service.getCharacteristic(characteristicId)
+            val characteristic: BluetoothGattCharacteristic? = service.getCharacteristic(characteristicId)
             if (characteristic != null) {
                 characteristic.value = value
                 val writeResult = bluetoothGatt?.writeCharacteristic(characteristic) ?: false
@@ -134,9 +179,9 @@ class Bluetooth {
     fun readCharacteristic(serviceUUID: UUID, characteristicId: UUID) {
         checkConnectionState()
 
-        val service = bluetoothGatt?.getService(serviceUUID)
+        val service: BluetoothGattService? = bluetoothGatt?.getService(serviceUUID)
         if (service != null) {
-            val characteristic = service.getCharacteristic(characteristicId)
+            val characteristic: BluetoothGattCharacteristic? = service.getCharacteristic(characteristicId)
             if (characteristic != null) {
                 val readResult = bluetoothGatt?.readCharacteristic(characteristic) ?: false
                 if (readResult) {
@@ -224,13 +269,14 @@ class Bluetooth {
     }
 
     enum class ErrorType {
-        CONNECTION_FAILED, READ_RSSI_FAILED
+        CONNECTION_FAILED, SCAN_FAILED, READ_RSSI_FAILED
     }
 
     sealed class Event {
         data class CharacteristicChanged(val characteristicId: UUID, val data: ByteArray) : Event()
         object Disconnected : Event()
         object Connected : Event()
+        data class Scan(val scanResult: ScanResult) : Event()
         data class Success(val data: BluetoothGattCharacteristic) : Event()
         data class SuccessRssi(val data: Int) : Event()
         data class Failure(val serviceUUID: UUID, val characteristicId: UUID, val msg: String) : Event()

@@ -4,18 +4,23 @@
     xmlns:tools="http://schemas.android.com/tools"
     >
 
-  <data class=".MainBinding"/>
+  <data class=".MainBinding">
+    <variable
+        name="viewModel"
+        type="com.arthurnagy.miactive.feature.MainViewModel"
+        />
+  </data>
 
   <android.support.constraint.ConstraintLayout
       android:layout_width="match_parent"
       android:layout_height="match_parent"
-      tools:context="com.arthurnagy.miactive.MainActivity"
+      tools:context="com.arthurnagy.miactive.feature.MainActivity"
       >
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
+        android:text="@{viewModel.bandDevice.name + viewModel.bandDevice.address}"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
