@@ -8,6 +8,7 @@ import com.arthurnagy.miband.MiBand.Event
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
 import org.koin.standalone.inject
+import timber.log.Timber
 
 class MainViewModel : MiActiveViewModel() {
 
@@ -26,11 +27,13 @@ class MainViewModel : MiActiveViewModel() {
                         is Event.User -> {
 
                         }
+                        is Event.HeartRateScan -> Timber.d("Heart rate: ${bandEvent.heartRate?.value}")
                     }
                 })
     }
 
     private fun setup() {
+        miBand.readHeartRate()
     }
 
 }

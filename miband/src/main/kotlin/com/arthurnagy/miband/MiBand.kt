@@ -60,8 +60,11 @@ class MiBand constructor(val bluetooth: Bluetooth) {
                     if (serviceId == UUID_SERVICE_MIBAND2_SERVICE) {
                         if (characteristicId == UUID_CHARACTERISTIC_BATTERY) Event.Battery(BatteryInfo.create(bluetoothEvent.data.value))
                         if (characteristicId == UUID_CHARACTERISTIC_USER_INFO) Event.User(UserInfo.create(bluetoothEvent.data.value))
-                        if (characteristicId == UUID_CHARACTERISTIC_HEART_RATE_MEASUREMENT || characteristicId == UUID_CHARACTERISTIC_HEART_RATE_CONTROL_POINT) Event.HeartRateScan(
-                                HeartRate.create(bluetoothEvent.data.value))
+                        if (characteristicId == UUID_CHARACTERISTIC_HEART_RATE_MEASUREMENT || characteristicId == UUID_CHARACTERISTIC_HEART_RATE_CONTROL_POINT)
+                            Event.HeartRateScan(HeartRate.create(bluetoothEvent.data.value))
+                    } else if (serviceId == UUID_SERVICE_HEART_RATE) {
+                        if (characteristicId == UUID_CHARACTERISTIC_HEART_RATE_MEASUREMENT || characteristicId == UUID_CHARACTERISTIC_HEART_RATE_CONTROL_POINT)
+                            Event.HeartRateScan(HeartRate.create(bluetoothEvent.data.value))
                     }
                     // TODO: handle
                     Error
@@ -125,7 +128,7 @@ class MiBand constructor(val bluetooth: Bluetooth) {
     sealed class Event {
         data class User(val userInfo: UserInfo) : Event()
         data class Battery(val batteryInfo: BatteryInfo) : Event()
-        data class HeartRateScan(val heartRate: HeartRate) : Event()
+        data class HeartRateScan(val heartRate: HeartRate?) : Event()
         data class BandScanned(val device: BluetoothDevice) : Event()
         object BandConnected : Event()
         object BandDisconnected : Event()
